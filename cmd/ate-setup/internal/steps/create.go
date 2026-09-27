@@ -177,8 +177,7 @@ func buildAuthenticationConfig(issuer string) string {
 	config := fmt.Sprintf(
 		"actorIdentityJWTProvider: kubernetes\njwtProviders:\n- name: kubernetes\n  issuer: %s\n  audiences: [api.ate-system.svc]\n",
 		issuer)
-	switch issuer {
-	case inClusterIssuer, inClusterIssuer + ".cluster.local":
+	if issuer == inClusterIssuer || issuer == inClusterIssuer+".cluster.local" || strings.HasPrefix(issuer, "https://api.internal.") {
 		config += "  certificateAuthorityFile: /var/run/secrets/kubernetes.io/serviceaccount/ca.crt\n" +
 			"  discoveryTokenFile: /var/run/secrets/kubernetes.io/serviceaccount/token\n"
 	}

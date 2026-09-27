@@ -28,9 +28,9 @@ import (
 	"github.com/agent-substrate/substrate/cmd/atelet/internal/ateletpath"
 	"github.com/agent-substrate/substrate/internal/proto/ateletpb"
 	"github.com/agent-substrate/substrate/internal/resources"
-	certsv1beta1 "k8s.io/api/certificates/v1beta1"
+	certsv1 "k8s.io/api/certificates/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	certlisters "k8s.io/client-go/listers/certificates/v1beta1"
+	certlisters "k8s.io/client-go/listers/certificates/v1"
 	"k8s.io/client-go/tools/cache"
 )
 
@@ -47,14 +47,14 @@ func newCTBStore(t *testing.T) *ctbStore {
 	return &ctbStore{indexer: indexer, lister: certlisters.NewClusterTrustBundleLister(indexer)}
 }
 
-func (s *ctbStore) object(raw string) *certsv1beta1.ClusterTrustBundle {
-	return &certsv1beta1.ClusterTrustBundle{
+func (s *ctbStore) object(raw string) *certsv1.ClusterTrustBundle {
+	return &certsv1.ClusterTrustBundle{
 		ObjectMeta: metav1.ObjectMeta{Name: egressTrustBundleObjectName},
-		Spec:       certsv1beta1.ClusterTrustBundleSpec{TrustBundle: raw},
+		Spec:       certsv1.ClusterTrustBundleSpec{TrustBundle: raw},
 	}
 }
 
-func (s *ctbStore) set(t *testing.T, raw string) *certsv1beta1.ClusterTrustBundle {
+func (s *ctbStore) set(t *testing.T, raw string) *certsv1.ClusterTrustBundle {
 	t.Helper()
 	obj := s.object(raw)
 	if err := s.indexer.Add(obj); err != nil {

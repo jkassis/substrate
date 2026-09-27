@@ -20,11 +20,11 @@ import (
 	"fmt"
 	"strings"
 
-	certsv1beta1 "k8s.io/api/certificates/v1beta1"
+	certsv1 "k8s.io/api/certificates/v1"
 	corev1 "k8s.io/api/core/v1"
 	k8errors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
-	certsv1beta1ac "k8s.io/client-go/applyconfigurations/certificates/v1beta1"
+	certsv1ac "k8s.io/client-go/applyconfigurations/certificates/v1"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -101,12 +101,12 @@ const egressMITMSignerName = "egress-mitm.ate.dev/mitm"
 
 const egressMITMTrustBundleName = "egress-mitm.ate.dev:mitm:primary-bundle"
 
-func buildEgressMITMTrustBundleApplyConfig(trustBundle string) *certsv1beta1ac.ClusterTrustBundleApplyConfiguration {
-	return certsv1beta1ac.ClusterTrustBundle(egressMITMTrustBundleName).
+func buildEgressMITMTrustBundleApplyConfig(trustBundle string) *certsv1ac.ClusterTrustBundleApplyConfiguration {
+	return certsv1ac.ClusterTrustBundle(egressMITMTrustBundleName).
 		WithLabels(map[string]string{
 			"podcert.ate.dev/canarying": "live",
 		}).
-		WithSpec(certsv1beta1ac.ClusterTrustBundleSpec().
+		WithSpec(certsv1ac.ClusterTrustBundleSpec().
 			WithSignerName(egressMITMSignerName).
 			WithTrustBundle(trustBundle))
 }
@@ -144,7 +144,7 @@ func egressMITMTrustBundlePEM(secret *corev1.Secret) (string, error) {
 func (r *EgressMITMTrustReconciler) deleteTrustBundle(ctx context.Context) error {
 	log := log.FromContext(ctx)
 
-	ctb := &certsv1beta1.ClusterTrustBundle{}
+	ctb := &certsv1.ClusterTrustBundle{}
 	if err := r.Get(ctx, types.NamespacedName{Name: egressMITMTrustBundleName}, ctb); err != nil {
 		if k8errors.IsNotFound(err) {
 			return nil
@@ -175,7 +175,7 @@ func (r *EgressMITMTrustReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		For(&corev1.Secret{}, builder.WithPredicates(predicate.NewPredicateFuncs(func(obj client.Object) bool {
 			return obj.GetNamespace() == poolRef.Namespace && obj.GetName() == poolRef.Name
 		}))).
-		Watches(&certsv1beta1.ClusterTrustBundle{},
+		Watches(&certsv1.ClusterTrustBundle{},
 			handler.EnqueueRequestsFromMapFunc(func(context.Context, client.Object) []reconcile.Request {
 				return []reconcile.Request{{NamespacedName: poolRef}}
 			}),

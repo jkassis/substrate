@@ -782,15 +782,16 @@ func (s *Store) remoteOpts(ctx context.Context, parsedRef name.Reference) []remo
 		remote.WithPlatform(platform),
 		remote.WithRetryBackoff(retryBackoffFor(registry)),
 	}
-	if s.authenticator != nil && registryUsesGCPAuth(registry) {
+	if s.authenticator != nil && registryUsesConfiguredAuth(registry) {
 		opts = append(opts, remote.WithAuth(s.authenticator))
 	}
 	return opts
 }
 
-func registryUsesGCPAuth(registry string) bool {
+func registryUsesConfiguredAuth(registry string) bool {
 	return registry == "gcr.io" || strings.HasSuffix(registry, ".gcr.io") ||
-		registry == "pkg.dev" || strings.HasSuffix(registry, ".pkg.dev")
+		registry == "pkg.dev" || strings.HasSuffix(registry, ".pkg.dev") ||
+		strings.Contains(registry, ".dkr.ecr.")
 }
 
 // parseRef applies the localhost-registry rewrite (kind local registries) and

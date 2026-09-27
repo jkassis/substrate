@@ -18,6 +18,7 @@ import (
 	"context"
 	"crypto/tls"
 	"crypto/x509"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -28,6 +29,7 @@ import (
 	"path/filepath"
 	"slices"
 	"strconv"
+	"strings"
 	"syscall"
 	"time"
 
@@ -59,6 +61,7 @@ import (
 	listersv1alpha1 "github.com/agent-substrate/substrate/pkg/client/listers/api/v1alpha1"
 	"github.com/agent-substrate/substrate/pkg/proto/ateapipb"
 	"github.com/aws/aws-sdk-go-v2/config"
+	"github.com/aws/aws-sdk-go-v2/service/ecr"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/google/go-containerregistry/pkg/authn"
 	googlecontainerauth "github.com/google/go-containerregistry/pkg/v1/google"
@@ -109,6 +112,30 @@ var (
 	drainDelay   = pflag.Duration("drain-delay", 0, "How long to keep accepting new RPCs after SIGTERM before starting the gRPC drain.")
 	drainTimeout = pflag.Duration("drain-timeout", 5*time.Minute, "Deadline for the graceful gRPC drain on shutdown. In-flight RPCs still running past it are forcefully cancelled.")
 )
+
+type ecrAuthenticator struct {
+	ctx    context.Context
+	client *ecr.Client
+}
+
+func (a *ecrAuthenticator) Authorization() (*authn.AuthConfig, error) {
+	result, err := a.client.GetAuthorizationToken(a.ctx, &ecr.GetAuthorizationTokenInput{})
+	if err != nil {
+		return nil, fmt.Errorf("get ECR authorization token: %w", err)
+	}
+	if len(result.AuthorizationData) != 1 || result.AuthorizationData[0].AuthorizationToken == nil {
+		return nil, fmt.Errorf("ECR returned no authorization token")
+	}
+	wire, err := base64.StdEncoding.DecodeString(*result.AuthorizationData[0].AuthorizationToken)
+	if err != nil {
+		return nil, fmt.Errorf("decode ECR authorization token: %w", err)
+	}
+	username, password, ok := strings.Cut(string(wire), ":")
+	if !ok {
+		return nil, fmt.Errorf("ECR authorization token has no username separator")
+	}
+	return &authn.AuthConfig{Username: username, Password: password}, nil
+}
 
 func main() {
 	pflag.Parse()
@@ -193,9 +220,15 @@ func main() {
 
 	ateomDialer := newAteomDialer(256)
 
-	var gcpRegistryAuthn authn.Authenticator
-	if *gcpAuthForImagePulls {
-		gcpRegistryAuthn, err = googlecontainerauth.NewEnvAuthenticator(ctx)
+	var registryAuthn authn.Authenticator
+	if os.Getenv("ATE_REGISTRY_AUTH") == "ecr" {
+		awsCfg, configErr := config.LoadDefaultConfig(ctx)
+		if configErr != nil {
+			serverboot.Fatal(ctx, "Failed to load AWS registry credentials", configErr)
+		}
+		registryAuthn = &ecrAuthenticator{ctx: ctx, client: ecr.NewFromConfig(awsCfg)}
+	} else if *gcpAuthForImagePulls {
+		registryAuthn, err = googlecontainerauth.NewEnvAuthenticator(ctx)
 		if err != nil {
 			serverboot.Fatal(ctx, "Failed to create GCP registry authenticator", err)
 		}
@@ -205,7 +238,7 @@ func main() {
 		serverboot.Fatal(ctx, "Invalid image cache GC flags", err)
 	}
 	imageCache, err := imagecache.New(*imageCacheDir,
-		imagecache.WithAuthenticator(gcpRegistryAuthn),
+		imagecache.WithAuthenticator(registryAuthn),
 		imagecache.WithLocalhostRegistryReplacement(*localhostRegistryReplacement),
 		imagecache.WithActorsDir(nodepath.ActorsDir),
 		imagecache.WithMinAge(*imageCacheMinAge),
@@ -276,7 +309,7 @@ func main() {
 		informers.WithTweakListOptions(func(o *metav1.ListOptions) {
 			o.FieldSelector = fields.OneTermEqualSelector("metadata.name", supportedTrustBundles[EgressTrustBundleName]).String()
 		}))
-	clusterTrustBundles := clusterTrustBundleInformerFactory.Certificates().V1beta1().ClusterTrustBundles()
+	clusterTrustBundles := clusterTrustBundleInformerFactory.Certificates().V1().ClusterTrustBundles()
 	systemInfoVolumes := newSystemInfoVolumeRefresher(clusterTrustBundles.Lister(), clusterTrustBundles.Informer())
 
 	stopCh := make(chan struct{})

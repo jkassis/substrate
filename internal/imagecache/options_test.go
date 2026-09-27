@@ -42,7 +42,7 @@ func TestOptionsApply(t *testing.T) {
 	}
 }
 
-func TestRegistryUsesGCPAuth(t *testing.T) {
+func TestRegistryUsesConfiguredAuth(t *testing.T) {
 	tests := []struct {
 		registry string
 		want     bool
@@ -52,6 +52,7 @@ func TestRegistryUsesGCPAuth(t *testing.T) {
 		{"eu.gcr.io", true},
 		{"pkg.dev", true},
 		{"us-docker.pkg.dev", true},
+		{"807125168235.dkr.ecr.us-west-2.amazonaws.com", true},
 		{"docker.io", false},
 		{"index.docker.io", false},
 		{"quay.io", false},
@@ -62,8 +63,8 @@ func TestRegistryUsesGCPAuth(t *testing.T) {
 		{"", false},
 	}
 	for _, tc := range tests {
-		if got := registryUsesGCPAuth(tc.registry); got != tc.want {
-			t.Errorf("registryUsesGCPAuth(%q) = %v, want %v", tc.registry, got, tc.want)
+		if got := registryUsesConfiguredAuth(tc.registry); got != tc.want {
+			t.Errorf("registryUsesConfiguredAuth(%q) = %v, want %v", tc.registry, got, tc.want)
 		}
 	}
 }

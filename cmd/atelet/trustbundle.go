@@ -22,7 +22,7 @@ import (
 	"strings"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	certlisters "k8s.io/client-go/listers/certificates/v1beta1"
+	certlisters "k8s.io/client-go/listers/certificates/v1"
 )
 
 // EgressTrustBundleName is the well-known name of the egress gateway CA

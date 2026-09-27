@@ -41,7 +41,7 @@ const (
 // the podcertificate controller publishes.
 var clusterTrustBundleGVK = schema.GroupVersionKind{
 	Group:   "certificates.k8s.io",
-	Version: "v1beta1",
+	Version: "v1",
 	Kind:    "ClusterTrustBundle",
 }
 

@@ -89,6 +89,17 @@ func TestBuildAuthenticationConfig(t *testing.T) {
 				"  certificateAuthorityFile: /var/run/secrets/kubernetes.io/serviceaccount/ca.crt\n" +
 				"  discoveryTokenFile: /var/run/secrets/kubernetes.io/serviceaccount/token",
 		},
+		{
+			name:   "kops internal issuer uses authenticated discovery",
+			issuer: "https://api.internal.ax.substrate.k8s.local",
+			want: "actorIdentityJWTProvider: kubernetes\n" +
+				"jwtProviders:\n" +
+				"- name: kubernetes\n" +
+				"  issuer: https://api.internal.ax.substrate.k8s.local\n" +
+				"  audiences: [api.ate-system.svc]\n" +
+				"  certificateAuthorityFile: /var/run/secrets/kubernetes.io/serviceaccount/ca.crt\n" +
+				"  discoveryTokenFile: /var/run/secrets/kubernetes.io/serviceaccount/token",
+		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			if got := buildAuthenticationConfig(tc.issuer); got != tc.want {

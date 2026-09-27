@@ -126,6 +126,11 @@ spec:
     spec:
       serviceAccountName: atelet
       priorityClassName: ate-node-critical
+      # atelet is trusted node infrastructure. Host networking lets the AWS ECR
+      # authenticator use the node role through IMDS while actor sandboxes remain
+      # isolated behind the Substrate data plane.
+      hostNetwork: true
+      dnsPolicy: ClusterFirstWithHostNet
       # Pin to nodes labelled with this substrate version. install-ate.sh labels unlabeled
       # nodes at install time; the operator owns the label afterwards.
       nodeSelector:
@@ -151,7 +156,7 @@ spec:
       - name: atelet
         image: ko://github.com/agent-substrate/substrate/cmd/atelet
         args:
-        - --gcp-auth-for-image-pulls=true
+        - --gcp-auth-for-image-pulls=false
         - --grpc-server-cred-bundle=/run/podidentity.podcert.ate.dev/credential-bundle.pem
         - --client-ca-certs=/run/podidentity.podcert.ate.dev/trust-bundle.pem
         - --ateapi-ca-file=/run/servicedns.podcert.ate.dev/trust-bundle.pem
@@ -200,7 +205,13 @@ spec:
         - name: OTEL_RESOURCE_ATTRIBUTES
           value: k8s.namespace.name=$(POD_NAMESPACE),k8s.pod.name=$(POD_NAME),k8s.pod.uid=$(POD_UID),k8s.node.name=$(NODE_NAME),service.instance.id=$(POD_UID)
         - name: ATE_STORAGE_BACKEND
-          value: "gcs"
+          value: "s3"
+        - name: ATE_REGISTRY_AUTH
+          value: "ecr"
+        - name: AWS_REGION
+          value: "us-west-2"
+        - name: AWS_DEFAULT_REGION
+          value: "us-west-2"
         # OTLP exporter settings are shared by every control plane component;
         # see manifests/ate-install/ate-otel-config.yaml.
         envFrom:

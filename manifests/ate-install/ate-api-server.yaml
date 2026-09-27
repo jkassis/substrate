@@ -62,10 +62,11 @@ metadata:
 spec:
   replicas: 2
   strategy:
-    # Update replicas one at a time, create a new one first, then delete the old one.
+    # Host networking reserves the metrics port on each node, so replace one
+    # replica before scheduling its successor.
     rollingUpdate:
-      maxUnavailable: 0
-      maxSurge: 1
+      maxUnavailable: 1
+      maxSurge: 0
   selector:
     matchLabels:
       app: ate-api-server
@@ -75,10 +76,21 @@ spec:
         app: ate-api-server
       annotations:
         prometheus.io/scrape: "true"
-        prometheus.io/port: "9090"
+        prometheus.io/port: "9190"
     spec:
-      # TODO: Add topologySpreadConstraints to spread replicas across nodes and zones.
       serviceAccountName: ate-api-server
+      # The API server is trusted control-plane infrastructure. Host networking
+      # lets the AWS SDK use the scoped kOps worker role through IMDS for S3
+      # snapshot lifecycle operations. Tenant actors remain in gVisor workers.
+      hostNetwork: true
+      dnsPolicy: ClusterFirstWithHostNet
+      affinity:
+        podAntiAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+          - labelSelector:
+              matchLabels:
+                app: ate-api-server
+            topologyKey: kubernetes.io/hostname
       # Budget for the full shutdown sequence: --drain-delay (sized to cover
       # the readinessProbe below reaching NotReady, plus propagation) +
       # --drain-timeout.
@@ -104,6 +116,9 @@ spec:
           # Graceful shutdown knobs. The sum must fit within terminationGracePeriodSeconds.
           - --drain-delay=13s
           - --drain-timeout=15s
+          # atelet also uses host port 9090. Keep the host-networked API
+          # server's health and metrics endpoint distinct.
+          - --metrics-listen-addr=:9190
         env:
         - name: POD_NAME
           valueFrom:
@@ -123,7 +138,7 @@ spec:
         # nothing refers to any more, so it needs the same backend atelet reads
         # and writes them through.
         - name: ATE_STORAGE_BACKEND
-          value: "gcs"
+          value: "s3"
         # OTLP exporter settings are shared by every control plane component;
         # see manifests/ate-install/ate-otel-config.yaml. Listed first so the
         # per-developer ConfigMap below can still override a key.
@@ -172,15 +187,15 @@ spec:
         ports:
         - containerPort: 443
         - name: prometheus
-          containerPort: 9090
+          containerPort: 9190
         readinessProbe:
           httpGet:
             path: /readyz
-            port: 9090
+            port: 9190
           initialDelaySeconds: 5
           periodSeconds: 2
           failureThreshold: 3
-        # :9090 is bound near the end of boot, after the store connect and
+        # :9190 is bound near the end of boot, after the store connect and
         # the schema migrations, so nothing answers here until both finish.
         # The store connect alone budgets 60s (30 attempts, 2s apart) and the
         # migrations serialize across replicas on an advisory lock. Without a
@@ -192,7 +207,7 @@ spec:
         startupProbe:
           httpGet:
             path: /healthz
-            port: 9090
+            port: 9190
           periodSeconds: 5
           failureThreshold: 24
         # /healthz stays 200 while a terminating pod drains; /readyz
@@ -201,7 +216,7 @@ spec:
         livenessProbe:
           httpGet:
             path: /healthz
-            port: 9090
+            port: 9190
           initialDelaySeconds: 10
           periodSeconds: 10
       volumes:

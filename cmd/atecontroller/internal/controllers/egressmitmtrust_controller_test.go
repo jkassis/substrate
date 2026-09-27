@@ -21,7 +21,7 @@ import (
 	"testing"
 	"time"
 
-	certsv1beta1 "k8s.io/api/certificates/v1beta1"
+	certsv1 "k8s.io/api/certificates/v1"
 	corev1 "k8s.io/api/core/v1"
 	k8errors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -92,9 +92,9 @@ func reconcilePool(t *testing.T, c client.Client) error {
 	return err
 }
 
-func getTrustBundle(t *testing.T, c client.Client) (*certsv1beta1.ClusterTrustBundle, bool) {
+func getTrustBundle(t *testing.T, c client.Client) (*certsv1.ClusterTrustBundle, bool) {
 	t.Helper()
-	ctb := &certsv1beta1.ClusterTrustBundle{}
+	ctb := &certsv1.ClusterTrustBundle{}
 	err := c.Get(context.Background(), types.NamespacedName{Name: egressMITMTrustBundleName}, ctb)
 	if k8errors.IsNotFound(err) {
 		return nil, false
@@ -242,9 +242,9 @@ func TestEgressMITMTrustDeletesBundleWhenPoolIsGone(t *testing.T) {
 func TestEgressMITMTrustLeavesForeignBundleAlone(t *testing.T) {
 	t.Parallel()
 	scheme := egressMITMScheme(t)
-	foreign := &certsv1beta1.ClusterTrustBundle{
+	foreign := &certsv1.ClusterTrustBundle{
 		ObjectMeta: metav1.ObjectMeta{Name: egressMITMTrustBundleName},
-		Spec:       certsv1beta1.ClusterTrustBundleSpec{SignerName: "someone.else.example/identity"},
+		Spec:       certsv1.ClusterTrustBundleSpec{SignerName: "someone.else.example/identity"},
 	}
 	c := fake.NewClientBuilder().WithScheme(scheme).WithObjects(foreign).Build()
 

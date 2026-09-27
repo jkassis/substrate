@@ -29,7 +29,7 @@ import (
 	"testing"
 	"time"
 
-	certsv1beta1 "k8s.io/api/certificates/v1beta1"
+	certsv1 "k8s.io/api/certificates/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/kubernetes/fake"
@@ -117,10 +117,10 @@ func testCAPEM(t *testing.T, cn string) []byte {
 	return pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: der})
 }
 
-func trustBundle(name, signer string, live bool, pemData []byte) *certsv1beta1.ClusterTrustBundle {
-	ctb := &certsv1beta1.ClusterTrustBundle{
+func trustBundle(name, signer string, live bool, pemData []byte) *certsv1.ClusterTrustBundle {
+	ctb := &certsv1.ClusterTrustBundle{
 		ObjectMeta: metav1.ObjectMeta{Name: name},
-		Spec: certsv1beta1.ClusterTrustBundleSpec{
+		Spec: certsv1.ClusterTrustBundleSpec{
 			SignerName:  signer,
 			TrustBundle: string(pemData),
 		},

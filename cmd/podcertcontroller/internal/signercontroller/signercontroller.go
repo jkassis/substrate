@@ -23,6 +23,7 @@ import (
 
 	"github.com/agent-substrate/substrate/cmd/podcertcontroller/internal/podcertificate"
 	"github.com/agent-substrate/substrate/cmd/podcertcontroller/internal/rendezvous"
+	certsv1 "k8s.io/api/certificates/v1"
 	certsv1beta1 "k8s.io/api/certificates/v1beta1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
@@ -36,7 +37,7 @@ import (
 
 type SignerImpl interface {
 	SignerName() string
-	DesiredClusterTrustBundles() ([]*certsv1beta1.ClusterTrustBundle, error)
+	DesiredClusterTrustBundles() ([]*certsv1.ClusterTrustBundle, error)
 	MakeCert(context.Context, *certsv1beta1.PodCertificateRequest) error
 }
 
@@ -216,9 +217,9 @@ func (c *Controller) ensureBundles(ctx context.Context) {
 	}
 
 	for _, wantCTB := range wantCTBs {
-		ctb, err := c.kc.CertificatesV1beta1().ClusterTrustBundles().Get(ctx, wantCTB.ObjectMeta.Name, metav1.GetOptions{})
+		ctb, err := c.kc.CertificatesV1().ClusterTrustBundles().Get(ctx, wantCTB.ObjectMeta.Name, metav1.GetOptions{})
 		if k8serrors.IsNotFound(err) {
-			_, err = c.kc.CertificatesV1beta1().ClusterTrustBundles().Create(ctx, wantCTB, metav1.CreateOptions{})
+			_, err = c.kc.CertificatesV1().ClusterTrustBundles().Create(ctx, wantCTB, metav1.CreateOptions{})
 			if err != nil {
 				slog.ErrorContext(ctx, "Error while creating ClusterTrustBundle",
 					slog.String("err", err.Error()),
@@ -245,7 +246,7 @@ func (c *Controller) ensureBundles(ctx context.Context) {
 		ctb.ObjectMeta.Labels = wantCTB.Labels
 		ctb.Spec.TrustBundle = wantCTB.Spec.TrustBundle
 
-		_, err = c.kc.CertificatesV1beta1().ClusterTrustBundles().Update(ctx, ctb, metav1.UpdateOptions{})
+		_, err = c.kc.CertificatesV1().ClusterTrustBundles().Update(ctx, ctb, metav1.UpdateOptions{})
 		if err != nil {
 			slog.ErrorContext(ctx, "Error while updating ClusterTrustBundle",
 				slog.String("err", err.Error()),

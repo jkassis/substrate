@@ -31,9 +31,9 @@ import (
 	"github.com/agent-substrate/substrate/internal/proto/ateletpb"
 	"github.com/agent-substrate/substrate/internal/resources"
 	"github.com/agent-substrate/substrate/internal/volumepath"
-	certsv1beta1 "k8s.io/api/certificates/v1beta1"
+	certsv1 "k8s.io/api/certificates/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
-	certlisters "k8s.io/client-go/listers/certificates/v1beta1"
+	certlisters "k8s.io/client-go/listers/certificates/v1"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/util/workqueue"
 )
@@ -267,7 +267,7 @@ func (r *systemInfoVolumeRefresher) eventHandler() cache.ResourceEventHandler {
 		if d, ok := obj.(cache.DeletedFinalStateUnknown); ok {
 			obj = d.Obj
 		}
-		ctb, ok := obj.(*certsv1beta1.ClusterTrustBundle)
+		ctb, ok := obj.(*certsv1.ClusterTrustBundle)
 		if !ok {
 			return
 		}

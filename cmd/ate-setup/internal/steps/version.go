@@ -117,7 +117,7 @@ func (e *Env) LabelNodesSubstrateVersion(ctx context.Context) error {
 	}
 	log.Stepf("label_nodes_substrate_version (%s)", version)
 	nodes, err := e.Kube.Typed.CoreV1().Nodes().List(ctx, metav1.ListOptions{
-		LabelSelector: "!" + versionlabel.Key,
+		LabelSelector: "ate.dev/enabled=true",
 	})
 	if err != nil {
 		return fmt.Errorf("while listing unlabeled nodes: %w", err)
