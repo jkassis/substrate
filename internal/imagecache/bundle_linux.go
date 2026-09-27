@@ -66,6 +66,12 @@ func SetupBundleRootfs(bundlePath string) error {
 		if err := os.MkdirAll(d, 0o755); err != nil {
 			return fmt.Errorf("while creating %q: %w", d, err)
 		}
+		// MkdirAll leaves a pre-existing directory's mode unchanged. Bundle
+		// staging creates these paths privately, so normalize them before they
+		// become the actor's overlay root.
+		if err := os.Chmod(d, 0o755); err != nil {
+			return fmt.Errorf("while making %q searchable: %w", d, err)
+		}
 	}
 	if err := os.MkdirAll(work, 0o700); err != nil {
 		return fmt.Errorf("while creating %q: %w", work, err)

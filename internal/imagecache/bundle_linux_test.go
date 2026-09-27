@@ -215,6 +215,11 @@ func TestSetupBundleRootfs_MountAndUnmount(t *testing.T) {
 	writeLayer(t, layer, map[string]string{"from-layer.txt": "hello"}, nil)
 
 	bundle := t.TempDir()
+	for _, name := range []string{"rootfs", "upper"} {
+		if err := os.Mkdir(filepath.Join(bundle, name), 0o700); err != nil {
+			t.Fatalf("precreate %s: %v", name, err)
+		}
+	}
 	if err := WriteSpec(bundle, &OverlaySpec{Layers: []string{layer}, ExtraDirs: []string{"/run/ate"}}); err != nil {
 		t.Fatalf("WriteSpec: %v", err)
 	}
