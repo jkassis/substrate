@@ -1469,15 +1469,14 @@ func (s *AteomHerder) prepareOCIBundles(
 	pauseImage string,
 	targetAteomUid string,
 ) error {
-	// Prepare host folders for volume types that need them.
-	for _, vol := range spec.GetVolumes() {
-		switch vol.GetSource().(type) {
-		case *ateletpb.Volume_DurableDir:
-			volPath := ateletpath.DurableDirVolumeMountPoint(actorUID, vol.GetName())
-			if err := os.MkdirAll(volPath, 0o700); err != nil {
-				return fmt.Errorf("while creating %q: %w", volPath, err)
-			}
-		}
+	// Durable volumes are bind-mounted over paths in the image. Give each one
+	// the UID/GID of the container that consumes it; leaving the host-created
+	// directory root:root/0700 makes a non-root container unable even to chdir
+	// into its declared workspace. A volume shared by several containers must
+	// use one group so 0770 remains least-privilege without making it globally
+	// writable.
+	if err := prepareDurableDirVolumes(actorUID, spec); err != nil {
+		return err
 	}
 
 	g, gCtx := errgroup.WithContext(ctx)
@@ -1534,6 +1533,58 @@ func (s *AteomHerder) prepareOCIBundles(
 	}
 
 	return g.Wait()
+}
+
+type volumeOwner struct {
+	uid uint32
+	gid uint32
+}
+
+func prepareDurableDirVolumes(actorUID string, spec *ateletpb.WorkloadSpec) error {
+	durable := make(map[string]bool)
+	for _, vol := range spec.GetVolumes() {
+		if _, ok := vol.GetSource().(*ateletpb.Volume_DurableDir); ok {
+			durable[vol.GetName()] = true
+		}
+	}
+
+	owners := make(map[string]volumeOwner)
+	for _, ctr := range spec.GetContainers() {
+		owner := volumeOwner{
+			uid: ctr.GetSecurityContext().GetRunAsUser(),
+			gid: ctr.GetSecurityContext().GetRunAsGroup(),
+		}
+		for _, mount := range ctr.GetVolumeMounts() {
+			if !durable[mount.GetName()] {
+				continue
+			}
+			if existing, ok := owners[mount.GetName()]; ok && existing.gid != owner.gid {
+				return fmt.Errorf("durable-dir volume %q is mounted by containers with different run_as_group values (%d and %d)", mount.GetName(), existing.gid, owner.gid)
+			}
+			if _, ok := owners[mount.GetName()]; !ok {
+				owners[mount.GetName()] = owner
+			}
+		}
+	}
+
+	for name := range durable {
+		volPath := ateletpath.DurableDirVolumeMountPoint(actorUID, name)
+		if err := os.MkdirAll(volPath, 0o770); err != nil {
+			return fmt.Errorf("while creating %q: %w", volPath, err)
+		}
+		owner, mounted := owners[name]
+		if !mounted {
+			owner = volumeOwner{}
+		}
+		if err := os.Chown(volPath, int(owner.uid), int(owner.gid)); err != nil {
+			return fmt.Errorf("while assigning durable-dir volume %q to %d:%d: %w", name, owner.uid, owner.gid, err)
+		}
+		// MkdirAll preserves the mode of a restored or pre-existing directory.
+		if err := os.Chmod(volPath, 0o770); err != nil {
+			return fmt.Errorf("while setting permissions on durable-dir volume %q: %w", name, err)
+		}
+	}
+	return nil
 }
 
 // dialAteom opens (or reuses) the gRPC connection to the target ateom

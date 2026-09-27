@@ -894,6 +894,70 @@ func TestBuildAteomWorkloadSpecValidation(t *testing.T) {
 	}
 }
 
+func TestPrepareDurableDirVolumesUsesContainerIdentity(t *testing.T) {
+	withTempActorsDir(t)
+	uid, gid := uint32(os.Getuid()), uint32(os.Getgid())
+	spec := &ateletpb.WorkloadSpec{
+		Volumes: []*ateletpb.Volume{{
+			Name: "workspace",
+			Source: &ateletpb.Volume_DurableDir{
+				DurableDir: &ateletpb.DurableDirVolume{},
+			},
+		}},
+		Containers: []*ateletpb.Container{{
+			Name: "guest",
+			VolumeMounts: []*ateletpb.VolumeMount{{
+				Name: "workspace", MountPath: "/workspace",
+			}},
+			SecurityContext: &ateletpb.SecurityContext{RunAsUser: uid, RunAsGroup: gid},
+		}},
+	}
+	path := ateletpath.DurableDirVolumeMountPoint("actor-1", "workspace")
+	if err := os.MkdirAll(path, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := prepareDurableDirVolumes("actor-1", spec); err != nil {
+		t.Fatal(err)
+	}
+	info, err := os.Stat(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got, want := info.Mode().Perm(), os.FileMode(0o770); got != want {
+		t.Errorf("volume mode = %v, want %v", got, want)
+	}
+	stat := info.Sys().(*syscall.Stat_t)
+	if stat.Uid != uid || stat.Gid != gid {
+		t.Errorf("volume owner = %d:%d, want %d:%d", stat.Uid, stat.Gid, uid, gid)
+	}
+}
+
+func TestPrepareDurableDirVolumesRejectsDifferentGroups(t *testing.T) {
+	withTempActorsDir(t)
+	spec := &ateletpb.WorkloadSpec{
+		Volumes: []*ateletpb.Volume{{
+			Name: "shared",
+			Source: &ateletpb.Volume_DurableDir{
+				DurableDir: &ateletpb.DurableDirVolume{},
+			},
+		}},
+		Containers: []*ateletpb.Container{
+			{
+				Name: "one", VolumeMounts: []*ateletpb.VolumeMount{{Name: "shared", MountPath: "/one"}},
+				SecurityContext: &ateletpb.SecurityContext{RunAsUser: 1000, RunAsGroup: 1000},
+			},
+			{
+				Name: "two", VolumeMounts: []*ateletpb.VolumeMount{{Name: "shared", MountPath: "/two"}},
+				SecurityContext: &ateletpb.SecurityContext{RunAsUser: 2000, RunAsGroup: 2000},
+			},
+		},
+	}
+	err := prepareDurableDirVolumes("actor-1", spec)
+	if err == nil || !strings.Contains(err.Error(), "different run_as_group") {
+		t.Fatalf("prepareDurableDirVolumes() error = %v, want group conflict", err)
+	}
+}
+
 func TestToAteomEgressGateway(t *testing.T) {
 	if got := toAteomEgressGateway(nil); got != nil {
 		t.Fatalf("toAteomEgressGateway(nil) = %v, want nil", got)
