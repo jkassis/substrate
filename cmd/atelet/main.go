@@ -1576,12 +1576,14 @@ func prepareDurableDirVolumes(actorUID string, spec *ateletpb.WorkloadSpec) erro
 		if !mounted {
 			owner = volumeOwner{}
 		}
-		if err := os.Chown(volPath, int(owner.uid), int(owner.gid)); err != nil {
-			return fmt.Errorf("while assigning durable-dir volume %q to %d:%d: %w", name, owner.uid, owner.gid, err)
-		}
 		// MkdirAll preserves the mode of a restored or pre-existing directory.
+		// Set it while atelet still owns the path: after chown, the deliberately
+		// minimal CAP_CHOWN-only capability set cannot chmod someone else's file.
 		if err := os.Chmod(volPath, 0o770); err != nil {
 			return fmt.Errorf("while setting permissions on durable-dir volume %q: %w", name, err)
+		}
+		if err := os.Chown(volPath, int(owner.uid), int(owner.gid)); err != nil {
+			return fmt.Errorf("while assigning durable-dir volume %q to %d:%d: %w", name, owner.uid, owner.gid, err)
 		}
 	}
 	return nil
