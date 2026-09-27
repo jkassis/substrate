@@ -1480,7 +1480,7 @@ func (s *AteomHerder) prepareOCIBundles(
 				ateompath.AteomNetNSPath(targetAteomUid),
 				spec.GetVolumes(),
 				ctr.GetVolumeMounts(),
-				resolveCapabilities(ctr.GetSecurityContext().GetCapabilities()),
+				ctr.GetSecurityContext(),
 				ctr.GetResources(),
 			); err != nil {
 				return wrapFileSystemErr(fmt.Sprintf("while creating %q OCI bundle", ctr.GetName()), err)

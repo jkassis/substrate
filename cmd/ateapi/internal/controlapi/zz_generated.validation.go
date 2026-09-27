@@ -2656,7 +2656,7 @@ func Validate_EgressPolicy(
 	return errs
 }
 
-var unionMembershipFor_github_com_agent_substrate_substrate_pkg_proto_ateapipb_EgressRule_ = validate.NewUnionMembership(validate.NewUnionMember("hostnames"), validate.NewUnionMember("cidrs"), validate.NewUnionMember("all"))
+var unionMembershipFor_github_com_agent_substrate_substrate_pkg_proto_ateapipb_EgressRule_ = validate.NewUnionMembership(validate.NewUnionMember("hostnames"), validate.NewUnionMember("cidrs"), validate.NewUnionMember("all"), validate.NewUnionMember("public"))
 
 // Validate_EgressRule validates an instance of EgressRule according
 // to declarative validation rules in the API schema.
@@ -2682,6 +2682,12 @@ func Validate_EgressRule(
 				return false
 			}
 			return obj.All != nil
+		},
+		func(obj *ateapipb.EgressRule) bool {
+			if obj == nil {
+				return false
+			}
+			return obj.Public != nil
 		}); len(e) != 0 {
 		errs = append(errs, e...)
 	}
@@ -2772,6 +2778,34 @@ func Validate_EgressRule(
 				return oldObj.All
 			})
 		errs = append(errs, fn(fldPath.Child("all"), obj.All, oldVal, oldObj != nil)...)
+	}
+
+	{ // field ateapipb.EgressRule.Public
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj *emptypb.Empty,
+			oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update {
+				if ateDeepEqual(obj, oldObj) {
+					return nil
+				}
+			}
+			// call field-attached validations
+			earlyReturn := false
+			if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj).MarkShortCircuit(); len(e) != 0 {
+				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
+			}
+			return
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *ateapipb.EgressRule) *emptypb.Empty {
+				return oldObj.Public
+			})
+		errs = append(errs, fn(fldPath.Child("public"), obj.Public, oldVal, oldObj != nil)...)
 	}
 
 	return errs
@@ -5549,6 +5583,10 @@ func Validate_SecurityContext(
 		errs = append(errs, fn(fldPath.Child("capabilities"), obj.Capabilities, oldVal, oldObj != nil)...)
 	}
 
+	// field ateapipb.SecurityContext.RunAsUser has no validation
+	// field ateapipb.SecurityContext.RunAsGroup has no validation
+	// field ateapipb.SecurityContext.ReadOnlyRootFilesystem has no validation
+	// field ateapipb.SecurityContext.NoNewPrivileges has no validation
 	return errs
 }
 
