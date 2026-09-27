@@ -75,7 +75,7 @@ func resolveCapabilities(caps *ateletpb.Capabilities) []string {
 	return out
 }
 
-func prepareOCIDirectory(ctx context.Context, imageCache *imagecache.Store, actorUID, containerName, ref string, command, args []string, env []string, netns string, volumes []*ateletpb.Volume, volumeMounts []*ateletpb.VolumeMount, capabilities []string, resources *ateletpb.ResourceLimits) error {
+func prepareOCIDirectory(ctx context.Context, imageCache *imagecache.Store, actorUID, containerName, ref string, command, args []string, env []string, netns string, volumes []*ateletpb.Volume, volumeMounts []*ateletpb.VolumeMount, securityContext *ateletpb.SecurityContext, resources *ateletpb.ResourceLimits) error {
 	tracer := otel.Tracer("prepareOCIDirectory")
 
 	ctx, span := tracer.Start(ctx, "prepareOCIDirectory")
@@ -154,7 +154,11 @@ func prepareOCIDirectory(ctx context.Context, imageCache *imagecache.Store, acto
 		NetNSPath:                 netns,
 		Volumes:                   volumes,
 		VolumeMounts:              volumeMounts,
-		Capabilities:              capabilities,
+		Capabilities:              resolveCapabilities(securityContext.GetCapabilities()),
+		RunAsUser:                 securityContext.GetRunAsUser(),
+		RunAsGroup:                securityContext.GetRunAsGroup(),
+		ReadOnlyRootFilesystem:    securityContext.GetReadOnlyRootFilesystem(),
+		NoNewPrivileges:           securityContext.GetNoNewPrivileges(),
 		Resources:                 resources,
 		DurableDirVolumeMountsDir: ateletpath.DurableDirVolumeMountsDir(actorUID),
 		VolumesDir:                ateletpath.VolumesDir(actorUID),

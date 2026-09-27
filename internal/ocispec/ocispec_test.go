@@ -163,6 +163,26 @@ func TestBuild_NoCapabilitiesForPause(t *testing.T) {
 	}
 }
 
+func TestBuild_SecurityContext(t *testing.T) {
+	spec := Build(Options{
+		ActorUID: testActorUID, ContainerName: "app", Args: []string{"/app"},
+		RunAsUser: 65532, RunAsGroup: 65532,
+		ReadOnlyRootFilesystem: true, NoNewPrivileges: true,
+	})
+	if got := spec.Process.User.UID; got != 65532 {
+		t.Errorf("Process.User.UID = %d, want 65532", got)
+	}
+	if got := spec.Process.User.GID; got != 65532 {
+		t.Errorf("Process.User.GID = %d, want 65532", got)
+	}
+	if !spec.Root.Readonly {
+		t.Error("Root.Readonly = false, want true")
+	}
+	if !spec.Process.NoNewPrivileges {
+		t.Error("Process.NoNewPrivileges = false, want true")
+	}
+}
+
 func TestSaveLoadRoundTrip(t *testing.T) {
 	bundle := t.TempDir()
 	want := Build(Options{Args: []string{"/app"}, NetNSPath: "/run/netns/x"})

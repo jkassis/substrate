@@ -40,10 +40,14 @@ type Options struct {
 	Args []string
 	Env  []string
 	// NetNSPath is the network namespace the ateom runs the actor in.
-	NetNSPath    string
-	Volumes      []*ateletpb.Volume
-	VolumeMounts []*ateletpb.VolumeMount
-	Capabilities []string
+	NetNSPath              string
+	Volumes                []*ateletpb.Volume
+	VolumeMounts           []*ateletpb.VolumeMount
+	Capabilities           []string
+	RunAsUser              uint32
+	RunAsGroup             uint32
+	ReadOnlyRootFilesystem bool
+	NoNewPrivileges        bool
 	// Resources are the container's own declared limits, or nil for none.
 	Resources *ateletpb.ResourceLimits
 
@@ -92,8 +96,8 @@ func Build(o Options) *specs.Spec {
 	spec := &specs.Spec{
 		Process: &specs.Process{
 			User: specs.User{
-				UID: 0,
-				GID: 0,
+				UID: o.RunAsUser,
+				GID: o.RunAsGroup,
 			},
 			Args: o.Args,
 			Env:  o.Env,
@@ -114,10 +118,11 @@ func Build(o Options) *specs.Spec {
 					Soft: 1024,
 				},
 			},
+			NoNewPrivileges: o.NoNewPrivileges,
 		},
 		Root: &specs.Root{
 			Path:     "rootfs",
-			Readonly: false,
+			Readonly: o.ReadOnlyRootFilesystem,
 		},
 		Hostname: hostname,
 		Mounts: []specs.Mount{

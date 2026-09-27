@@ -298,6 +298,10 @@ message Container {
 // SecurityContext holds security settings for a container's process.
 message SecurityContext {
   Capabilities capabilities = 1;
+  uint32 run_as_user = 2;
+  uint32 run_as_group = 3;
+  bool read_only_root_filesystem = 4;
+  bool no_new_privileges = 5;
 }
 
 // Capabilities adjusts a container's Linux capabilities relative to the default

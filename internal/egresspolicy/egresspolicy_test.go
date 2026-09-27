@@ -35,6 +35,31 @@ func allRule() *ateapipb.EgressRule {
 	return &ateapipb.EgressRule{All: &emptypb.Empty{}}
 }
 
+func publicRule() *ateapipb.EgressRule {
+	return &ateapipb.EgressRule{Public: &emptypb.Empty{}}
+}
+
+func TestPublicRule(t *testing.T) {
+	p := mustCompile(t, policy(publicRule()))
+	for _, raw := range []string{"1.1.1.1", "8.8.8.8", "2606:4700:4700::1111"} {
+		if !p.Evaluate(addr(raw)).Allowed {
+			t.Errorf("public address %s denied", raw)
+		}
+	}
+	for _, raw := range []string{
+		"0.0.0.0", "10.0.0.1", "100.64.0.1", "127.0.0.1",
+		"169.254.169.254", "172.16.0.1", "192.168.0.1", "198.18.0.1",
+		"::", "::1", "2001:db8::1", "fd00::1", "fe80::1", "ff02::1",
+	} {
+		if p.Evaluate(addr(raw)).Allowed {
+			t.Errorf("non-public address %s allowed", raw)
+		}
+	}
+	if p.Evaluate(host("example.com")).Allowed {
+		t.Error("public rule allowed an unresolved hostname")
+	}
+}
+
 func policy(rules ...*ateapipb.EgressRule) *ateapipb.EgressPolicy {
 	return &ateapipb.EgressPolicy{Rules: rules}
 }

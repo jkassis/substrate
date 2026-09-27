@@ -247,14 +247,26 @@ func toAteletWakeupProbe(in *ateapipb.ContainerWakeupProbe) *ateletpb.WakeupProb
 // ateletpb wire type. Returns nil when the source is nil or carries nothing,
 // so containers that set no security settings stay unchanged on the wire.
 func toAteletSecurityContext(in *ateapipb.SecurityContext) *ateletpb.SecurityContext {
-	caps := in.GetCapabilities()
-	if caps == nil || (len(caps.GetAdd()) == 0 && len(caps.GetDrop()) == 0) {
+	if in == nil {
 		return nil
 	}
-	return &ateletpb.SecurityContext{
-		Capabilities: &ateletpb.Capabilities{
+	caps := in.GetCapabilities()
+	if (caps == nil || (len(caps.GetAdd()) == 0 && len(caps.GetDrop()) == 0)) &&
+		in.GetRunAsUser() == 0 && in.GetRunAsGroup() == 0 &&
+		!in.GetReadOnlyRootFilesystem() && !in.GetNoNewPrivileges() {
+		return nil
+	}
+	out := &ateletpb.SecurityContext{
+		RunAsUser:              in.GetRunAsUser(),
+		RunAsGroup:             in.GetRunAsGroup(),
+		ReadOnlyRootFilesystem: in.GetReadOnlyRootFilesystem(),
+		NoNewPrivileges:        in.GetNoNewPrivileges(),
+	}
+	if caps != nil {
+		out.Capabilities = &ateletpb.Capabilities{
 			Add:  caps.GetAdd(),
 			Drop: caps.GetDrop(),
-		},
+		}
 	}
+	return out
 }
