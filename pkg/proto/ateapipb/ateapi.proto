@@ -447,6 +447,17 @@ message EgressRule {
   // +k8s:optional
   // +k8s:unionMember
   google.protobuf.Empty public = 4;
+
+  // Destination ports this rule may authorize. An empty list matches every
+  // port. The gateway evaluates the actual dialed port; a request leg that
+  // cannot determine a port does not match a port-constrained rule.
+  //
+  // +k8s:optional
+  // +k8s:maxItems=64
+  // +k8s:listType=set
+  // +k8s:eachVal=+k8s:minimum=1
+  // +k8s:eachVal=+k8s:maximum=65535
+  repeated int32 ports = 5;
 }
 
 // HostnameRule matches requests by destination hostname.

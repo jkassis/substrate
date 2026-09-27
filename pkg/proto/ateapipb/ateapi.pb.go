@@ -1131,7 +1131,17 @@ type EgressRule struct {
 	//
 	// +k8s:optional
 	// +k8s:unionMember
-	Public        *emptypb.Empty `protobuf:"bytes,4,opt,name=public,proto3" json:"public,omitempty"`
+	Public *emptypb.Empty `protobuf:"bytes,4,opt,name=public,proto3" json:"public,omitempty"`
+	// Destination ports this rule may authorize. An empty list matches every
+	// port. The gateway evaluates the actual dialed port; a request leg that
+	// cannot determine a port does not match a port-constrained rule.
+	//
+	// +k8s:optional
+	// +k8s:maxItems=64
+	// +k8s:listType=set
+	// +k8s:eachVal=+k8s:minimum=1
+	// +k8s:eachVal=+k8s:maximum=65535
+	Ports         []int32 `protobuf:"varint,5,rep,packed,name=ports,proto3" json:"ports,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1190,6 +1200,13 @@ func (x *EgressRule) GetAll() *emptypb.Empty {
 func (x *EgressRule) GetPublic() *emptypb.Empty {
 	if x != nil {
 		return x.Public
+	}
+	return nil
+}
+
+func (x *EgressRule) GetPorts() []int32 {
+	if x != nil {
+		return x.Ports
 	}
 	return nil
 }
@@ -7279,13 +7296,14 @@ const file_ateapi_proto_rawDesc = "" +
 	"\x06status\x18\a \x01(\v2\x13.ateapi.ActorStatusR\x06status\"n\n" +
 	"\fEgressPolicy\x124\n" +
 	"\bmetadata\x18\x01 \x01(\v2\x18.ateapi.ResourceMetadataR\bmetadata\x12(\n" +
-	"\x05rules\x18\x02 \x03(\v2\x12.ateapi.EgressRuleR\x05rules\"\xc2\x01\n" +
+	"\x05rules\x18\x02 \x03(\v2\x12.ateapi.EgressRuleR\x05rules\"\xd8\x01\n" +
 	"\n" +
 	"EgressRule\x122\n" +
 	"\thostnames\x18\x01 \x01(\v2\x14.ateapi.HostnameRuleR\thostnames\x12&\n" +
 	"\x05cidrs\x18\x02 \x01(\v2\x10.ateapi.CIDRRuleR\x05cidrs\x12(\n" +
 	"\x03all\x18\x03 \x01(\v2\x16.google.protobuf.EmptyR\x03all\x12.\n" +
-	"\x06public\x18\x04 \x01(\v2\x16.google.protobuf.EmptyR\x06public\"_\n" +
+	"\x06public\x18\x04 \x01(\v2\x16.google.protobuf.EmptyR\x06public\x12\x14\n" +
+	"\x05ports\x18\x05 \x03(\x05R\x05ports\"_\n" +
 	"\fHostnameRule\x12\x1a\n" +
 	"\bpatterns\x18\x01 \x03(\tR\bpatterns\x123\n" +
 	"\aeffects\x18\x02 \x01(\v2\x19.ateapi.EgressRuleEffectsR\aeffects\" \n" +

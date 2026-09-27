@@ -39,6 +39,10 @@ func publicRule() *ateapipb.EgressRule {
 	return &ateapipb.EgressRule{Public: &emptypb.Empty{}}
 }
 
+func publicPortsRule(ports ...int32) *ateapipb.EgressRule {
+	return &ateapipb.EgressRule{Public: &emptypb.Empty{}, Ports: ports}
+}
+
 func TestPublicRule(t *testing.T) {
 	p := mustCompile(t, policy(publicRule()))
 	for _, raw := range []string{"1.1.1.1", "8.8.8.8", "2606:4700:4700::1111"} {
@@ -57,6 +61,23 @@ func TestPublicRule(t *testing.T) {
 	}
 	if p.Evaluate(host("example.com")).Allowed {
 		t.Error("public rule allowed an unresolved hostname")
+	}
+}
+
+func TestRulePortsConstrainTheObservedDestination(t *testing.T) {
+	p := mustCompile(t, policy(publicPortsRule(80, 443)))
+	for _, port := range []uint16{80, 443} {
+		if got := p.Evaluate(Destination{IP: netip.MustParseAddr("1.1.1.1"), Port: port}); !got.Allowed {
+			t.Errorf("public port %d denied: %+v", port, got)
+		}
+	}
+	for _, port := range []uint16{0, 22, 3306} {
+		if got := p.Evaluate(Destination{IP: netip.MustParseAddr("1.1.1.1"), Port: port}); got.Allowed {
+			t.Errorf("port %d allowed by an 80/443 rule: %+v", port, got)
+		}
+	}
+	if got := p.Evaluate(Destination{IP: netip.MustParseAddr("10.0.0.1"), Port: 443}); got.Allowed {
+		t.Errorf("private destination allowed on an admitted port: %+v", got)
 	}
 }
 
@@ -237,12 +258,13 @@ func TestCompileReportsAndDropsInvalidEntries(t *testing.T) {
 	compiled, errs := Compile(policy(
 		hostnameRule("good.example.com", "BAD.example.com"),
 		ipBlockRule("192.0.2.0/24", "192.0.2.1/24"),
+		publicPortsRule(443, 0, 65536),
 	))
-	if len(errs) != 2 {
-		t.Fatalf("Compile errors = %v, want 2", errs)
+	if len(errs) != 4 {
+		t.Fatalf("Compile errors = %v, want 4", errs)
 	}
-	if compiled.RuleCount() != 2 {
-		t.Errorf("RuleCount = %d, want 2", compiled.RuleCount())
+	if compiled.RuleCount() != 3 {
+		t.Errorf("RuleCount = %d, want 3", compiled.RuleCount())
 	}
 	if d := compiled.Evaluate(host("good.example.com")); !d.Allowed || d.RuleIndex != 0 {
 		t.Errorf("valid pattern of a partly invalid rule should still match, got %+v", d)
@@ -252,6 +274,9 @@ func TestCompileReportsAndDropsInvalidEntries(t *testing.T) {
 	}
 	if d := compiled.Evaluate(addr("192.0.2.7")); !d.Allowed || d.RuleIndex != 1 {
 		t.Errorf("valid cidr of a partly invalid rule should still match, got %+v", d)
+	}
+	if d := compiled.Evaluate(Destination{IP: netip.MustParseAddr("1.1.1.1"), Port: 443}); !d.Allowed || d.RuleIndex != 2 {
+		t.Errorf("valid port of a partly invalid rule should still match, got %+v", d)
 	}
 }
 

@@ -74,6 +74,7 @@ type compiledRule struct {
 	cidrs     []netip.Prefix
 	all       bool
 	public    bool
+	ports     map[uint16]struct{}
 }
 
 var nonPublicPrefixes = []netip.Prefix{
@@ -121,7 +122,14 @@ func Compile(policy *ateapipb.EgressPolicy) (*Policy, []error) {
 	var errs []error
 	compiled := &Policy{}
 	for i, rule := range policy.GetRules() {
-		var cr compiledRule
+		cr := compiledRule{ports: make(map[uint16]struct{}, len(rule.GetPorts()))}
+		for _, raw := range rule.GetPorts() {
+			if raw < 1 || raw > 65535 {
+				errs = append(errs, fmt.Errorf("rules[%d].ports: %d is not a valid destination port", i, raw))
+				continue
+			}
+			cr.ports[uint16(raw)] = struct{}{}
+		}
 		switch {
 		case rule.GetHostnames() != nil:
 			for _, raw := range rule.GetHostnames().GetPatterns() {
@@ -172,6 +180,11 @@ func (p *Policy) HasHostnameRules() bool {
 // Only that rule's effects apply; a request is denied when no rule matches.
 func (p *Policy) Evaluate(dest Destination) Decision {
 	for i, rule := range p.rules {
+		if len(rule.ports) > 0 {
+			if _, allowed := rule.ports[dest.Port]; !allowed {
+				continue
+			}
+		}
 		switch {
 		case rule.all:
 			return Decision{Allowed: true, RuleIndex: i}
