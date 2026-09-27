@@ -1648,10 +1648,14 @@ func (x *Container) GetResources() *ResourceLimits {
 
 // SecurityContext holds security settings for a container's process.
 type SecurityContext struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Capabilities  *Capabilities          `protobuf:"bytes,1,opt,name=capabilities,proto3" json:"capabilities,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state                  protoimpl.MessageState `protogen:"open.v1"`
+	Capabilities           *Capabilities          `protobuf:"bytes,1,opt,name=capabilities,proto3" json:"capabilities,omitempty"`
+	RunAsUser              uint32                 `protobuf:"varint,2,opt,name=run_as_user,json=runAsUser,proto3" json:"run_as_user,omitempty"`
+	RunAsGroup             uint32                 `protobuf:"varint,3,opt,name=run_as_group,json=runAsGroup,proto3" json:"run_as_group,omitempty"`
+	ReadOnlyRootFilesystem bool                   `protobuf:"varint,4,opt,name=read_only_root_filesystem,json=readOnlyRootFilesystem,proto3" json:"read_only_root_filesystem,omitempty"`
+	NoNewPrivileges        bool                   `protobuf:"varint,5,opt,name=no_new_privileges,json=noNewPrivileges,proto3" json:"no_new_privileges,omitempty"`
+	unknownFields          protoimpl.UnknownFields
+	sizeCache              protoimpl.SizeCache
 }
 
 func (x *SecurityContext) Reset() {
@@ -1689,6 +1693,34 @@ func (x *SecurityContext) GetCapabilities() *Capabilities {
 		return x.Capabilities
 	}
 	return nil
+}
+
+func (x *SecurityContext) GetRunAsUser() uint32 {
+	if x != nil {
+		return x.RunAsUser
+	}
+	return 0
+}
+
+func (x *SecurityContext) GetRunAsGroup() uint32 {
+	if x != nil {
+		return x.RunAsGroup
+	}
+	return 0
+}
+
+func (x *SecurityContext) GetReadOnlyRootFilesystem() bool {
+	if x != nil {
+		return x.ReadOnlyRootFilesystem
+	}
+	return false
+}
+
+func (x *SecurityContext) GetNoNewPrivileges() bool {
+	if x != nil {
+		return x.NoNewPrivileges
+	}
+	return false
 }
 
 // Capabilities adjusts a container's Linux capabilities relative to the default
@@ -2788,9 +2820,14 @@ const file_atelet_proto_rawDesc = "" +
 	"\x06readyz\x18\x05 \x01(\v2\x0e.atelet.ReadyzR\x06readyz\x128\n" +
 	"\rvolume_mounts\x18\x06 \x03(\v2\x13.atelet.VolumeMountR\fvolumeMounts\x12B\n" +
 	"\x10security_context\x18\b \x01(\v2\x17.atelet.SecurityContextR\x0fsecurityContext\x124\n" +
-	"\tresources\x18\t \x01(\v2\x16.atelet.ResourceLimitsR\tresources\"K\n" +
+	"\tresources\x18\t \x01(\v2\x16.atelet.ResourceLimitsR\tresources\"\xf4\x01\n" +
 	"\x0fSecurityContext\x128\n" +
-	"\fcapabilities\x18\x01 \x01(\v2\x14.atelet.CapabilitiesR\fcapabilities\"4\n" +
+	"\fcapabilities\x18\x01 \x01(\v2\x14.atelet.CapabilitiesR\fcapabilities\x12\x1e\n" +
+	"\vrun_as_user\x18\x02 \x01(\rR\trunAsUser\x12 \n" +
+	"\frun_as_group\x18\x03 \x01(\rR\n" +
+	"runAsGroup\x129\n" +
+	"\x19read_only_root_filesystem\x18\x04 \x01(\bR\x16readOnlyRootFilesystem\x12*\n" +
+	"\x11no_new_privileges\x18\x05 \x01(\bR\x0fnoNewPrivileges\"4\n" +
 	"\fCapabilities\x12\x10\n" +
 	"\x03add\x18\x01 \x03(\tR\x03add\x12\x12\n" +
 	"\x04drop\x18\x02 \x03(\tR\x04drop\"R\n" +

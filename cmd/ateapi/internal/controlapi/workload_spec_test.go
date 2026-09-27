@@ -481,6 +481,10 @@ func TestWorkloadSpecFromActorTemplatePropagatesSecurityContext(t *testing.T) {
 						Add:  []string{"NET_ADMIN"},
 						Drop: []string{"ALL"},
 					},
+					RunAsUser:              65532,
+					RunAsGroup:             65532,
+					ReadOnlyRootFilesystem: true,
+					NoNewPrivileges:        true,
 				},
 			},
 			{
@@ -510,6 +514,10 @@ func TestWorkloadSpecFromActorTemplatePropagatesSecurityContext(t *testing.T) {
 						Add:  []string{"NET_ADMIN"},
 						Drop: []string{"ALL"},
 					},
+					RunAsUser:              65532,
+					RunAsGroup:             65532,
+					ReadOnlyRootFilesystem: true,
+					NoNewPrivileges:        true,
 				},
 			},
 			{

@@ -426,6 +426,15 @@ message EgressRule {
   // +k8s:optional
   // +k8s:unionMember
   google.protobuf.Empty all = 3;
+
+  // Matches globally routable Internet addresses while excluding loopback,
+  // link-local, private, shared, documentation, benchmark, multicast, and
+  // otherwise reserved address space. The gateway evaluates the address on
+  // every connection, including after redirects and DNS resolution.
+  //
+  // +k8s:optional
+  // +k8s:unionMember
+  google.protobuf.Empty public = 4;
 }
 
 // HostnameRule matches requests by destination hostname.
@@ -985,6 +994,16 @@ message SecurityContext {
   //
   // +k8s:optional
   Capabilities capabilities = 1;
+
+  // run_as_user and run_as_group select the numeric identity for the process.
+  // Zero preserves the historical root default.
+  uint32 run_as_user = 2;
+  uint32 run_as_group = 3;
+
+  // read_only_root_filesystem prevents writes outside explicitly writable
+  // mounts. no_new_privileges prevents exec from gaining privileges.
+  bool read_only_root_filesystem = 4;
+  bool no_new_privileges = 5;
 }
 
 // Capabilities adjusts a container's Linux capabilities relative to the
