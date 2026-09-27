@@ -165,7 +165,7 @@ func TestBuild_NoCapabilitiesForPause(t *testing.T) {
 
 func TestBuild_SecurityContext(t *testing.T) {
 	spec := Build(Options{
-		ActorUID: testActorUID, ContainerName: "app", Args: []string{"/app"},
+		Args:      []string{"/app"},
 		RunAsUser: 65532, RunAsGroup: 65532,
 		ReadOnlyRootFilesystem: true, NoNewPrivileges: true,
 	})
