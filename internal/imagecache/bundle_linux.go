@@ -59,10 +59,16 @@ func SetupBundleRootfs(bundlePath string) error {
 	rootfs := filepath.Join(bundlePath, "rootfs")
 	upper := filepath.Join(bundlePath, "upper")
 	work := filepath.Join(bundlePath, "work")
-	for _, d := range []string{rootfs, upper, work} {
-		if err := os.MkdirAll(d, 0o700); err != nil {
+	// The overlay root becomes the actor container's /. Keep both the mount
+	// point and upper root searchable by a non-root process; 0700 makes every
+	// otherwise-executable image entry unreachable after runAsUser is applied.
+	for _, d := range []string{rootfs, upper} {
+		if err := os.MkdirAll(d, 0o755); err != nil {
 			return fmt.Errorf("while creating %q: %w", d, err)
 		}
+	}
+	if err := os.MkdirAll(work, 0o700); err != nil {
+		return fmt.Errorf("while creating %q: %w", work, err)
 	}
 
 	// Detach any stale mount left by a previous incarnation of this bundle

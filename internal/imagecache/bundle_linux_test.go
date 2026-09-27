@@ -226,6 +226,11 @@ func TestSetupBundleRootfs_MountAndUnmount(t *testing.T) {
 	if got, err := os.ReadFile(filepath.Join(bundle, "rootfs", "from-layer.txt")); err != nil || string(got) != "hello" {
 		t.Errorf("layer content not visible through overlay: %q (%v)", got, err)
 	}
+	if fi, err := os.Stat(filepath.Join(bundle, "rootfs")); err != nil {
+		t.Errorf("stat rootfs: %v", err)
+	} else if fi.Mode().Perm()&0o111 != 0o111 {
+		t.Errorf("rootfs is not searchable by a non-root actor: mode=%v", fi.Mode())
+	}
 	if fi, err := os.Stat(filepath.Join(bundle, "rootfs", "run", "ate")); err != nil || !fi.IsDir() {
 		t.Errorf("ExtraDir missing in overlay: %v", err)
 	}
