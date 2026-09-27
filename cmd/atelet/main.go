@@ -317,7 +317,10 @@ func main() {
 	ateFactory.Start(stopCh)
 	clusterTrustBundleInformerFactory.Start(stopCh)
 	ateFactory.WaitForCacheSync(stopCh)
-	clusterTrustBundleInformerFactory.WaitForCacheSync(stopCh)
+	// ClusterTrustBundle is optional on clusters that use the CSR/configmap
+	// identity backend. Its reflector keeps retrying in the background; do not
+	// prevent the node service and ateom support socket from starting when the
+	// API is not served.
 
 	wmService := NewService(
 		ctx,
