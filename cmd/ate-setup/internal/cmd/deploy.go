@@ -28,6 +28,11 @@ var deployCmd = &cobra.Command{
 // deployOpts holds the flags of deploy ate-system.
 var deployOpts steps.DeployOptions
 
+// deployPostgresOpts holds the storage flags of deploy postgres. Keeping these
+// separate prevents one command invocation from leaking values into another in
+// tests that execute the package-level Cobra tree more than once.
+var deployPostgresOpts steps.DeployOptions
+
 var deployAteSystemCmd = &cobra.Command{
 	Use:   "ate-system",
 	Short: "Deploy the core system: CRDs, RBAC, store, apiserver, controller, atenet, and atelet",
@@ -107,9 +112,14 @@ var deployPostgresCmd = &cobra.Command{
 ATE_API_POSTGRES_CONNECTION_STRING or the ATE_API_POSTGRES_CLOUDSQL_* variables
 select an external database; this subcommand is for bringing the StatefulSet up
 by itself.`,
-	Args: cobra.NoArgs,
+	Args: func(cmd *cobra.Command, args []string) error {
+		if err := cobra.NoArgs(cmd, args); err != nil {
+			return err
+		}
+		return deployPostgresOpts.Validate()
+	},
 	RunE: func(cmd *cobra.Command, _ []string) error {
-		return env.DeployPostgres(cmd.Context())
+		return env.DeployPostgres(cmd.Context(), deployPostgresOpts)
 	},
 }
 
@@ -130,5 +140,9 @@ func init() {
 	deployAteSystemCmd.Flags().StringVar(&deployOpts.PostgresStorageClass, "postgres-storage-class", "",
 		"StorageClass for a new bundled PostgreSQL claim (default: manifest default)")
 	deployAteSystemCmd.Flags().StringVar(&deployOpts.PostgresStorageSize, "postgres-storage-size", "",
+		"Capacity for a new bundled PostgreSQL claim (for example 20Gi; default: manifest default)")
+	deployPostgresCmd.Flags().StringVar(&deployPostgresOpts.PostgresStorageClass, "postgres-storage-class", "",
+		"StorageClass for a new bundled PostgreSQL claim (default: manifest default)")
+	deployPostgresCmd.Flags().StringVar(&deployPostgresOpts.PostgresStorageSize, "postgres-storage-size", "",
 		"Capacity for a new bundled PostgreSQL claim (for example 20Gi; default: manifest default)")
 }

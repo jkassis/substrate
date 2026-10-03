@@ -197,6 +197,21 @@ func TestDeployOptionsValidatePostgresStorage(t *testing.T) {
 	}
 }
 
+func TestDeployPostgresStorageOptionsReachManifest(t *testing.T) {
+	objs := postgresObjects(t, false)
+	if err := applyPostgresStorageOverrides(objs, "gp3-encrypted-retain", "20Gi"); err != nil {
+		t.Fatalf("applyPostgresStorageOverrides: %v", err)
+	}
+	ss := findObject(objs, "StatefulSet", "postgres")
+	claims, _, _ := unstructured.NestedSlice(ss.Object, "spec", "volumeClaimTemplates")
+	claim := claims[0].(map[string]any)
+	class, _, _ := unstructured.NestedString(claim, "spec", "storageClassName")
+	size, _, _ := unstructured.NestedString(claim, "spec", "resources", "requests", "storage")
+	if class != "gp3-encrypted-retain" || size != "20Gi" {
+		t.Errorf("standalone postgres storage = %s/%s, want gp3-encrypted-retain/20Gi", class, size)
+	}
+}
+
 func TestPlanPostgres(t *testing.T) {
 	for _, tc := range []struct {
 		name       string

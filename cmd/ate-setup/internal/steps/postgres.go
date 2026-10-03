@@ -241,7 +241,7 @@ func applyPostgresSize10Overrides(objs []*unstructured.Unstructured, confPatch [
 
 // DeployPostgres deploys the experimental single-replica PostgreSQL
 // StatefulSet on its own.
-func (e *Env) DeployPostgres(ctx context.Context) error {
+func (e *Env) DeployPostgres(ctx context.Context, opts DeployOptions) error {
 	log.Step("deploy_postgres")
 
 	if err := e.EnsureAteSystemNamespace(ctx); err != nil {
@@ -258,7 +258,7 @@ func (e *Env) DeployPostgres(ctx context.Context) error {
 		return err
 	}
 
-	if err := e.applyPostgres(ctx, "", ""); err != nil {
+	if err := e.applyPostgres(ctx, opts.PostgresStorageClass, opts.PostgresStorageSize); err != nil {
 		return err
 	}
 	return e.Kube.RolloutStatus(ctx, kube.KindStatefulSet, e.Namespace(), "postgres", e.Cfg.RolloutTimeout)
