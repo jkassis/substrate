@@ -69,6 +69,16 @@ func TestPostgresManifestPathSelectsKindOverlay(t *testing.T) {
 	}
 }
 
+func TestPostgresStatefulSetHasRequiredWorkloadLabel(t *testing.T) {
+	ss := findObject(postgresObjects(t, false), "StatefulSet", "postgres")
+	if ss == nil {
+		t.Fatal("postgres manifest has no statefulset/postgres")
+	}
+	if got := ss.GetLabels()["app"]; got != "postgres" {
+		t.Errorf("statefulset metadata label app = %q, want postgres", got)
+	}
+}
+
 // Runs the size10 resize over the real manifest and the real config patch, so
 // a drift between the two (a renamed ConfigMap key, a second container) fails
 // here rather than on a size10 install.
