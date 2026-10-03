@@ -251,13 +251,6 @@ func (e *Env) DeployPostgres(ctx context.Context, opts DeployOptions) error {
 		return err
 	}
 
-	// The StatefulSet's projected serving certificate is issued by this
-	// controller. Applying it here makes `deploy postgres` usable on a fresh
-	// cluster as well as after `deploy ate-system`.
-	if err := e.DeployPodCertificateController(ctx); err != nil {
-		return err
-	}
-
 	if err := e.applyPostgres(ctx, opts.PostgresStorageClass, opts.PostgresStorageSize); err != nil {
 		return err
 	}
