@@ -73,12 +73,12 @@ func (e *Env) planPostgres(ctx context.Context) (postgresPlan, error) {
 
 // applyBundledPostgres applies the bundled PostgreSQL StatefulSet, or logs that
 // it was skipped in favor of an external database.
-func (e *Env) applyBundledPostgres(ctx context.Context, plan postgresPlan) error {
+func (e *Env) applyBundledPostgres(ctx context.Context, plan postgresPlan, opts DeployOptions) error {
 	if !plan.bundled {
 		log.Stepf("Skipping bundled PostgreSQL: external database configured (%s)", plan.external)
 		return nil
 	}
-	return e.applyPostgres(ctx)
+	return e.applyPostgres(ctx, opts.PostgresStorageClass, opts.PostgresStorageSize)
 }
 
 // postgresManifestPath is the bundled PostgreSQL manifest for the environment:
@@ -99,7 +99,7 @@ func (e *Env) postgresManifestPath() string {
 // rollout wait sees is the resized one. It also means a later server-side
 // apply of the same objects cannot half-revert them, which a post-apply patch
 // under a different field manager would be exposed to.
-func (e *Env) applyPostgres(ctx context.Context) error {
+func (e *Env) applyPostgres(ctx context.Context, storageClass, storageSize string) error {
 	manifest, err := e.render(e.postgresManifestPath())
 	if err != nil {
 		return err
@@ -118,7 +118,53 @@ func (e *Env) applyPostgres(ctx context.Context) error {
 			return err
 		}
 	}
+	if storageClass != "" || storageSize != "" {
+		log.Step("apply_postgres_storage_overrides")
+		if err := applyPostgresStorageOverrides(objs, storageClass, storageSize); err != nil {
+			return err
+		}
+	}
 	return e.Kube.Apply(ctx, objs)
+}
+
+// applyPostgresStorageOverrides changes only the bundled StatefulSet's claim
+// template. Existing claims are never resized or replaced by this operation;
+// operators must migrate them separately before applying an incompatible
+// template to a live StatefulSet.
+func applyPostgresStorageOverrides(objs []*unstructured.Unstructured, storageClass, storageSize string) error {
+	var statefulSet *unstructured.Unstructured
+	for _, obj := range objs {
+		if obj.GetNamespace() == NamespaceAteSystem && obj.GetKind() == "StatefulSet" && obj.GetName() == "postgres" {
+			statefulSet = obj
+			break
+		}
+	}
+	if statefulSet == nil {
+		return fmt.Errorf("the postgres manifest has no statefulset/postgres to configure storage")
+	}
+	claims, found, err := unstructured.NestedSlice(statefulSet.Object, "spec", "volumeClaimTemplates")
+	if err != nil || !found || len(claims) != 1 {
+		return fmt.Errorf("%s must have exactly one volume claim template", kube.Describe(statefulSet))
+	}
+	claim, ok := claims[0].(map[string]any)
+	if !ok {
+		return fmt.Errorf("%s: volume claim template 0 is not an object", kube.Describe(statefulSet))
+	}
+	if storageClass != "" {
+		if err := unstructured.SetNestedField(claim, storageClass, "spec", "storageClassName"); err != nil {
+			return fmt.Errorf("while setting PostgreSQL storage class: %w", err)
+		}
+	}
+	if storageSize != "" {
+		if err := unstructured.SetNestedField(claim, storageSize, "spec", "resources", "requests", "storage"); err != nil {
+			return fmt.Errorf("while setting PostgreSQL storage size: %w", err)
+		}
+	}
+	claims[0] = claim
+	if err := unstructured.SetNestedSlice(statefulSet.Object, claims, "spec", "volumeClaimTemplates"); err != nil {
+		return fmt.Errorf("while configuring %s storage: %w", kube.Describe(statefulSet), err)
+	}
+	return nil
 }
 
 // applyPostgresSize10Overrides resizes the bundled PostgreSQL objects in place
@@ -212,7 +258,7 @@ func (e *Env) DeployPostgres(ctx context.Context) error {
 		return err
 	}
 
-	if err := e.applyPostgres(ctx); err != nil {
+	if err := e.applyPostgres(ctx, "", ""); err != nil {
 		return err
 	}
 	return e.Kube.RolloutStatus(ctx, kube.KindStatefulSet, e.Namespace(), "postgres", e.Cfg.RolloutTimeout)

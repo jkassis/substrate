@@ -146,6 +146,57 @@ func TestApplyPostgresSize10OverridesRejectsMissingObjects(t *testing.T) {
 	}
 }
 
+func TestApplyPostgresStorageOverrides(t *testing.T) {
+	objs := postgresObjects(t, false)
+	if err := applyPostgresStorageOverrides(objs, "gp3-encrypted-retain", "20Gi"); err != nil {
+		t.Fatalf("applyPostgresStorageOverrides: %v", err)
+	}
+
+	ss := findObject(objs, "StatefulSet", "postgres")
+	claims, _, _ := unstructured.NestedSlice(ss.Object, "spec", "volumeClaimTemplates")
+	if len(claims) != 1 {
+		t.Fatalf("volumeClaimTemplates has %d entries, want 1", len(claims))
+	}
+	claim := claims[0].(map[string]any)
+	class, _, _ := unstructured.NestedString(claim, "spec", "storageClassName")
+	if class != "gp3-encrypted-retain" {
+		t.Errorf("storageClassName = %q, want gp3-encrypted-retain", class)
+	}
+	size, _, _ := unstructured.NestedString(claim, "spec", "resources", "requests", "storage")
+	if size != "20Gi" {
+		t.Errorf("storage request = %q, want 20Gi", size)
+	}
+}
+
+func TestApplyPostgresStorageOverridesRejectsMissingClaim(t *testing.T) {
+	objs := postgresObjects(t, false)
+	ss := findObject(objs, "StatefulSet", "postgres")
+	unstructured.RemoveNestedField(ss.Object, "spec", "volumeClaimTemplates")
+	if err := applyPostgresStorageOverrides(objs, "gp3", "20Gi"); err == nil {
+		t.Error("applyPostgresStorageOverrides succeeded without a claim template, want an error")
+	}
+}
+
+func TestDeployOptionsValidatePostgresStorage(t *testing.T) {
+	for _, tc := range []struct {
+		name    string
+		opts    DeployOptions
+		wantErr bool
+	}{
+		{name: "defaults", opts: DeployOptions{SetupCSI: "none"}},
+		{name: "storage override", opts: DeployOptions{SetupCSI: "none", PostgresStorageClass: "gp3-encrypted-retain", PostgresStorageSize: "20Gi"}},
+		{name: "bad size", opts: DeployOptions{SetupCSI: "none", PostgresStorageSize: "twenty"}, wantErr: true},
+		{name: "zero size", opts: DeployOptions{SetupCSI: "none", PostgresStorageSize: "0Gi"}, wantErr: true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			err := tc.opts.Validate()
+			if (err != nil) != tc.wantErr {
+				t.Fatalf("Validate() error = %v, wantErr %t", err, tc.wantErr)
+			}
+		})
+	}
+}
+
 func TestPlanPostgres(t *testing.T) {
 	for _, tc := range []struct {
 		name       string

@@ -42,7 +42,9 @@ ATE_API_POSTGRES_CONNECTION_STRING or the ATE_API_POSTGRES_CLOUDSQL_* variables
 select an external database.
 
 Shape the install with the global --atenet-dataplane, --cluster-size, and
---cordon-control-plane flags.`,
+--cordon-control-plane flags. For the bundled database,
+--postgres-storage-class and --postgres-storage-size override the claim
+template for new storage; they do not migrate an existing claim.`,
 	// Flags are parsed by the time cobra validates arguments, and argument
 	// validation is the last thing that happens before the root command loads
 	// the configuration and connects to a cluster. Checking --setup-csi here
@@ -125,4 +127,8 @@ func init() {
 	deployAteSystemCmd.Flags().StringVar(&deployOpts.SetupCSI, "setup-csi", "none",
 		"Also install CSI driver (nfs, hostpath, both, none; default: none)")
 	deployAteSystemCmd.Flags().Lookup("setup-csi").NoOptDefVal = "none"
+	deployAteSystemCmd.Flags().StringVar(&deployOpts.PostgresStorageClass, "postgres-storage-class", "",
+		"StorageClass for a new bundled PostgreSQL claim (default: manifest default)")
+	deployAteSystemCmd.Flags().StringVar(&deployOpts.PostgresStorageSize, "postgres-storage-size", "",
+		"Capacity for a new bundled PostgreSQL claim (for example 20Gi; default: manifest default)")
 }

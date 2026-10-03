@@ -20,6 +20,7 @@ import (
 	"strconv"
 	"time"
 
+	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 
@@ -45,12 +46,31 @@ type DeployOptions struct {
 	// SetupCSI additionally installs the CSI driver (nfs, hostpath, both, none).
 	// Kind only. The hostpath driver is Kind only.
 	SetupCSI string
+	// PostgresStorageClass overrides the bundled PostgreSQL claim's storage
+	// class. Empty preserves the manifest default.
+	PostgresStorageClass string
+	// PostgresStorageSize overrides the bundled PostgreSQL claim's requested
+	// capacity. Empty preserves the manifest default.
+	PostgresStorageSize string
 }
 
 // Validate checks the options that can be checked without configuration or a
 // cluster, so the command can reject them while cobra is still parsing.
 func (o DeployOptions) Validate() error {
-	return ValidateCSIDriver(o.SetupCSI)
+	if err := ValidateCSIDriver(o.SetupCSI); err != nil {
+		return err
+	}
+	if o.PostgresStorageSize == "" {
+		return nil
+	}
+	quantity, err := resource.ParseQuantity(o.PostgresStorageSize)
+	if err != nil {
+		return fmt.Errorf("invalid PostgreSQL storage size %q: %w", o.PostgresStorageSize, err)
+	}
+	if quantity.Sign() <= 0 {
+		return fmt.Errorf("invalid PostgreSQL storage size %q: must be positive", o.PostgresStorageSize)
+	}
+	return nil
 }
 
 // DeployAteSystem installs the whole control plane: CRDs, RBAC, the
@@ -136,7 +156,7 @@ func (e *Env) DeployAteSystem(ctx context.Context, opts DeployOptions) error {
 	if err != nil {
 		return err
 	}
-	if err := e.applyBundledPostgres(ctx, postgres); err != nil {
+	if err := e.applyBundledPostgres(ctx, postgres, opts); err != nil {
 		return err
 	}
 
