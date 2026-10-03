@@ -79,6 +79,47 @@ func TestPostgresStatefulSetHasRequiredWorkloadLabel(t *testing.T) {
 	}
 }
 
+func TestPostgresUsesCSRCredentialAgent(t *testing.T) {
+	ss := findObject(postgresObjects(t, false), "StatefulSet", "postgres")
+	podSpec, found, err := unstructured.NestedMap(ss.Object, "spec", "template", "spec")
+	if err != nil || !found {
+		t.Fatalf("postgres pod spec: found=%v err=%v", found, err)
+	}
+
+	containers, _, _ := unstructured.NestedSlice(podSpec, "containers")
+	if got := findNamed(containers, "servicedns-credential-agent"); got == nil {
+		t.Fatal("postgres has no servicedns-credential-agent sidecar")
+	}
+	initContainers, _, _ := unstructured.NestedSlice(podSpec, "initContainers")
+	if got := findNamed(initContainers, "servicedns-credential-bootstrap"); got == nil {
+		t.Fatal("postgres has no servicedns credential bootstrap init container")
+	}
+
+	volumes, _, _ := unstructured.NestedSlice(podSpec, "volumes")
+	servicedns := findNamed(volumes, "servicedns")
+	if _, found, _ := unstructured.NestedMap(servicedns, "emptyDir"); !found {
+		t.Fatal("postgres servicedns credentials are not backed by an emptyDir")
+	}
+	podIdentity := findNamed(volumes, "podidentity-ca")
+	name, _, _ := unstructured.NestedString(podIdentity, "configMap", "name")
+	if name != "podidentity-active-trust" {
+		t.Fatalf("postgres podidentity trust ConfigMap = %q, want podidentity-active-trust", name)
+	}
+}
+
+func findNamed(objects []any, name string) map[string]any {
+	for _, raw := range objects {
+		obj, ok := raw.(map[string]any)
+		if !ok {
+			continue
+		}
+		if got, _, _ := unstructured.NestedString(obj, "name"); got == name {
+			return obj
+		}
+	}
+	return nil
+}
+
 // Runs the size10 resize over the real manifest and the real config patch, so
 // a drift between the two (a renamed ConfigMap key, a second container) fails
 // here rather than on a size10 install.

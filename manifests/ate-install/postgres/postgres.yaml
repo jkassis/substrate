@@ -120,6 +120,25 @@ spec:
       # postgres-owned and group-readable, which it rejects.
       # See https://www.postgresql.org/docs/current/ssl-tcp.html#SSL-SETUP
       initContainers:
+      - name: servicedns-credential-bootstrap
+        image: ko://github.com/agent-substrate/substrate/cmd/podcredentialagent
+        args:
+        - --signer-name=servicedns.csr.podcert.ate.dev/identity
+        - --credential-path=/identity/credential-bundle.pem
+        - --trust-path=/identity/trust-bundle.pem
+        - --once
+        volumeMounts:
+        - name: servicedns
+          mountPath: /identity
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop: ["ALL"]
+          readOnlyRootFilesystem: true
+          runAsGroup: 65532
+          runAsUser: 0
+          seccompProfile:
+            type: RuntimeDefault
       - name: tls-reloader
         restartPolicy: Always
         image: postgres:18-alpine@sha256:9a8afca54e7861fd90fab5fdf4c42477a6b1cb7d293595148e674e0a3181de15
@@ -214,33 +233,42 @@ spec:
           limits:
             cpu: "16"
             memory: "2Gi"
+      - name: servicedns-credential-agent
+        image: ko://github.com/agent-substrate/substrate/cmd/podcredentialagent
+        args:
+        - --signer-name=servicedns.csr.podcert.ate.dev/identity
+        - --credential-path=/identity/credential-bundle.pem
+        - --trust-path=/identity/trust-bundle.pem
+        volumeMounts:
+        - name: servicedns
+          mountPath: /identity
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop: ["ALL"]
+          readOnlyRootFilesystem: true
+          runAsGroup: 65532
+          runAsUser: 0
+          seccompProfile:
+            type: RuntimeDefault
       volumes:
       - name: config
         configMap:
           name: postgres-config
       - name: servicedns
-        projected:
-          # 0600 plus the group read that fsGroup adds is the 0640 above.
-          defaultMode: 0600
-          sources:
-          - podCertificate:
-              signerName: servicedns.podcert.ate.dev/identity
-              keyType: ECDSAP256
-              credentialBundlePath: credential-bundle.pem
+        emptyDir:
+          medium: Memory
       # The unix socket directory, shared so the sidecar can ask the running
       # server to reload. The image defaults both the server and its clients to
       # this path, so nothing else has to know about it.
       - name: socket
         emptyDir: {}
       - name: podidentity-ca
-        projected:
-          sources:
-          - clusterTrustBundle:
-              signerName: podidentity.podcert.ate.dev/identity
-              labelSelector:
-                matchLabels:
-                  podcert.ate.dev/canarying: live
-              path: trust-bundle.pem
+        configMap:
+          name: podidentity-active-trust
+          items:
+          - key: trust-bundle.pem
+            path: trust-bundle.pem
   volumeClaimTemplates:
   - metadata:
       name: data
