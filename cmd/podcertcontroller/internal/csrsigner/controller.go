@@ -23,11 +23,13 @@ import (
 	"github.com/agent-substrate/substrate/internal/substratex509"
 	certsv1 "k8s.io/api/certificates/v1"
 	corev1 "k8s.io/api/core/v1"
+	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/cache"
+	"k8s.io/client-go/util/retry"
 	"k8s.io/client-go/util/workqueue"
 )
 
@@ -208,13 +210,35 @@ func (c *Controller) sign(ctx context.Context, csr *certsv1.CertificateSigningRe
 			return fmt.Errorf("approve CSR: %w", err)
 		}
 	}
-	csr = csr.DeepCopy()
-	csr.Status.Certificate = certificate.Bytes()
-	if _, err := c.kc.CertificatesV1().CertificateSigningRequests().UpdateStatus(ctx, csr, metav1.UpdateOptions{}); err != nil {
+	if err := c.publishCertificate(ctx, csr.Name, certificate.Bytes()); err != nil {
 		return fmt.Errorf("publish certificate: %w", err)
 	}
 	slog.InfoContext(ctx, "Issued authenticated pod certificate", "csr", csr.Name, "signer", csr.Spec.SignerName, "pod", id.namespace+"/"+id.podName)
 	return nil
+}
+
+func (c *Controller) publishCertificate(ctx context.Context, name string, certificate []byte) error {
+	return retry.RetryOnConflict(retry.DefaultBackoff, func() error {
+		csr, err := c.kc.CertificatesV1().CertificateSigningRequests().Get(ctx, name, metav1.GetOptions{})
+		if k8serrors.IsNotFound(err) {
+			// The credential agent deletes a CSR immediately after consuming a
+			// published certificate. A duplicate informer event may arrive here
+			// after that successful exchange.
+			return nil
+		}
+		if err != nil {
+			return err
+		}
+		if len(csr.Status.Certificate) != 0 {
+			return nil
+		}
+		csr.Status.Certificate = certificate
+		_, err = c.kc.CertificatesV1().CertificateSigningRequests().UpdateStatus(ctx, csr, metav1.UpdateOptions{})
+		if k8serrors.IsNotFound(err) {
+			return nil
+		}
+		return err
+	})
 }
 
 func (c *Controller) validate(ctx context.Context, csr *certsv1.CertificateSigningRequest) (*x509.CertificateRequest, identity, *corev1.Pod, error) {
