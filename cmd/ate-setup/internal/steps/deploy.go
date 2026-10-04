@@ -226,6 +226,18 @@ func (e *Env) DeployAteSystem(ctx context.Context, opts DeployOptions) error {
 // reason: one apply means one rollout, and the rollout wait sees the pod that
 // will actually serve.
 func (e *Env) DeployPodCertificateController(ctx context.Context) error {
+	return e.deployPodCertificateController(ctx, true)
+}
+
+// DeployPodCertificateControllerOnly applies and verifies only the certificate
+// controller. It omits the ClusterTrustBundle wait because CSR/ConfigMap
+// compatibility clusters do not serve that API; successful CSR issuance is
+// verified by the release procedure after rollout.
+func (e *Env) DeployPodCertificateControllerOnly(ctx context.Context) error {
+	return e.deployPodCertificateController(ctx, false)
+}
+
+func (e *Env) deployPodCertificateController(ctx context.Context, waitForTrustBundles bool) error {
 	path := e.Cfg.Manifest("pod-certificate-controller.yaml")
 	if e.Cfg.Size10() {
 		path = e.Cfg.Manifest("podcert-size10")
@@ -249,6 +261,9 @@ func (e *Env) DeployPodCertificateController(ctx context.Context) error {
 	}
 	if err := e.Kube.RolloutStatus(ctx, kube.KindDeployment, NamespacePodCert, "podcertificate-controller", e.Cfg.WaitTimeout(BootstrapTimeout)); err != nil {
 		return err
+	}
+	if !waitForTrustBundles {
+		return nil
 	}
 	return e.WaitForPodCertificateTrustBundles(ctx)
 }

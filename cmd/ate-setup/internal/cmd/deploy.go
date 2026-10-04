@@ -123,6 +123,15 @@ by itself.`,
 	},
 }
 
+var deployPodCertificateControllerCmd = &cobra.Command{
+	Use:   "podcertificate-controller",
+	Short: "Deploy the pod certificate controller without redeploying ATE workloads",
+	Args:  cobra.NoArgs,
+	RunE: func(cmd *cobra.Command, _ []string) error {
+		return env.DeployPodCertificateControllerOnly(cmd.Context())
+	},
+}
+
 func init() {
 	rootCmd.AddCommand(deployCmd)
 	deployCmd.AddCommand(
@@ -132,6 +141,7 @@ func init() {
 		deployControllerCmd,
 		deployAtenetCmd,
 		deployPostgresCmd,
+		deployPodCertificateControllerCmd,
 	)
 
 	deployAteSystemCmd.Flags().StringVar(&deployOpts.SetupCSI, "setup-csi", "none",

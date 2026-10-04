@@ -30,6 +30,7 @@ import (
 	"path/filepath"
 	"syscall"
 
+	"github.com/agent-substrate/substrate/cmd/podcertcontroller/internal/csrsigner"
 	"github.com/agent-substrate/substrate/cmd/podcertcontroller/internal/podcertificate"
 	"github.com/agent-substrate/substrate/cmd/podcertcontroller/internal/podidentitysigner"
 	"github.com/agent-substrate/substrate/cmd/podcertcontroller/internal/rendezvous"
@@ -80,7 +81,6 @@ var (
 		1,
 		"Number of concurrent worker goroutines per signer.",
 	)
-
 	kubeAPIQPS = pflag.Float32(
 		"kube-api-qps",
 		0,
@@ -96,7 +96,8 @@ var (
 )
 
 func main() {
-	ctx := context.Background()
+	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
+	defer stop()
 
 	pflag.Parse()
 	if *showVersion {
@@ -141,10 +142,27 @@ func main() {
 		os.Exit(1)
 	}
 
+	// Load both CA pools before starting either credential backend.
+	serviceDNSCAPool, err := localca.NewRefreshingPool(*serviceDNSCAPoolFile)
+	if err != nil {
+		slog.ErrorContext(ctx, "Error loading servicedns.ate.dev/identity CA pool state", slog.Any("err", err))
+		os.Exit(1)
+	}
+	podIdentityCAPool, err := localca.NewRefreshingPool(*podCAPoolFile)
+	if err != nil {
+		slog.ErrorContext(ctx, "Error loading podidentity.podcert.ate.dev/identity CA pool state", slog.Any("err", err))
+		os.Exit(1)
+	}
+
 	pcrClient, err := podcertificate.NewClient(kc)
 	if err != nil {
-		slog.ErrorContext(ctx, "Error discovering PodCertificateRequest API", slog.Any("err", err))
-		os.Exit(1)
+		slog.WarnContext(ctx, "PodCertificateRequest API unavailable; using authenticated CSR compatibility backend", slog.Any("err", err))
+		controller := csrsigner.New(kc, serviceDNSCAPool, podIdentityCAPool)
+		if err := controller.Run(ctx, *workersPerSigner); err != nil {
+			slog.ErrorContext(ctx, "CSR compatibility controller stopped", slog.Any("err", err))
+			os.Exit(1)
+		}
+		return
 	}
 
 	hasher := rendezvous.New(
@@ -158,19 +176,9 @@ func main() {
 	go hasher.Run(ctx)
 
 	// Create a signer for servicedns.ate.dev/identity
-	serviceDNSCAPool, err := localca.NewRefreshingPool(*serviceDNSCAPoolFile)
-	if err != nil {
-		slog.ErrorContext(ctx, "Error loading servicedns.ate.dev/identity CA pool state", slog.Any("err", err))
-		os.Exit(1)
-	}
 	serviceDNSSignerController := signercontroller.New(clock.RealClock{}, servicednssigner.NewImpl(kc, serviceDNSCAPool, pcrClient), kc, hasher, pcrClient)
 
 	// Create a signer for podidentity.podcert.ate.dev/identity
-	podIdentityCAPool, err := localca.NewRefreshingPool(*podCAPoolFile)
-	if err != nil {
-		slog.ErrorContext(ctx, "Error loading podidentity.podcert.ate.dev/identity CA pool state", slog.Any("err", err))
-		os.Exit(1)
-	}
 	podIdentitySignerController := signercontroller.New(clock.RealClock{}, podidentitysigner.NewImpl(kc, podIdentityCAPool, pcrClient), kc, hasher, pcrClient)
 	go pcrClient.Informer().Run(ctx.Done())
 	go serviceDNSSignerController.Run(ctx, *workersPerSigner)
@@ -178,8 +186,5 @@ func main() {
 
 	// TODO: Reload when the file changes.
 
-	signalCh := make(chan os.Signal, 1)
-	signal.Notify(signalCh, syscall.SIGINT, syscall.SIGTERM)
-
-	<-signalCh
+	<-ctx.Done()
 }

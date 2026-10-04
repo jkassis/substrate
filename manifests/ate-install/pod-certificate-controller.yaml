@@ -35,11 +35,19 @@ rules:
 - apiGroups:
   - certificates.k8s.io
   resources:
+  - certificatesigningrequests
   - podcertificaterequests
   verbs:
   - get
   - list
   - watch
+  - update
+- apiGroups:
+  - certificates.k8s.io
+  resources:
+  - certificatesigningrequests/approval
+  - certificatesigningrequests/status
+  verbs:
   - update
 - apiGroups:
   - certificates.k8s.io
@@ -63,9 +71,12 @@ rules:
   resources:
   - signers
   resourceNames:
+  - servicedns.csr.podcert.ate.dev/identity
+  - podidentity.csr.podcert.ate.dev/identity
   - servicedns.podcert.ate.dev/*
   - podidentity.podcert.ate.dev/*
   verbs:
+  - approve
   - sign
   - attest
 - apiGroups:
